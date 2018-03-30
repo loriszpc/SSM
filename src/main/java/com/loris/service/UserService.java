@@ -1,8 +1,6 @@
 package com.loris.service;
 
 import com.loris.entity.User;
-import com.loris.util.annotation.DataSource;
-
 import java.util.List;
 
 /**

@@ -39,7 +39,7 @@ public class UserController {
             userList.add(user);
         }
         int count=userService.addUser(userList);
-        return null;
+        return "home";
     }
 
 }
