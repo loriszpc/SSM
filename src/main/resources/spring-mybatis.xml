@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:tx="http://www.springframework.org/schema/tx"
+       xmlns:aop="http://www.springframework.org/schema/aop"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans
+       http://www.springframework.org/schema/beans/spring-beans-4.1.xsd
+       http://www.springframework.org/schema/tx
+       http://www.springframework.org/schema/tx/spring-tx-4.1.xsd
+       http://www.springframework.org/schema/aop
+       http://www.springframework.org/schema/aop/spring-aop-4.1.xsd">
+
+
+
+    <bean id="abstractDataSource" abstract="true" class="com.alibaba.druid.pool.DruidDataSource" init-method="init" destroy-method="close">
+        <property name="driverClassName" value="com.mysql.jdbc.Driver"/>
+        <property name="initialSize" value="5"/>
+        <property name="minIdle" value="1"/>
+        <property name="maxActive" value="100"/>
+        <!-- 配置获取连接等待超时的时间 -->
+        <property name="maxWait" value="60000"/>
+        <!-- 配置间隔多久才进行一次检测，检测需要关闭的空闲连接，单位是毫秒 -->
+        <property name="timeBetweenEvictionRunsMillis" value="60000"/>
+        <!-- 配置一个连接在池中最小生存的时间，单位是毫秒 -->
+        <property name="minEvictableIdleTimeMillis" value="300000"/>
+        <!-- 打开PSCache，并且指定每个连接上PSCache的大小 -->
+        <property name="poolPreparedStatements" value="true"/>
+        <property name="maxPoolPreparedStatementPerConnectionSize" value="20"/>
+        <property name="filters" value="config"/>
+        <property name="connectionProperties" value="config.decrypt=true" />
+    </bean>
+
+    <bean id="dataSourceRead" parent="abstractDataSource">
+        <!-- 基本属性 url、user、password -->
+        <property name="url" value="jdbc:mysql://192.168.197.112:3306/test"/>
+        <property name="username" value="root"/>
+        <property name="password" value="123456"/>
+    </bean>
+
+
+    <!--可以配置多个从数据库，因为我的mariaDB的版本号不支持一主多从模式，所以需要探索slave -> slave 模式，当配置成功之后此段配置信息可放开-->
+    <!--<bean id="dataSourceRead2" parent="abstractDataSource">-->
+        <!--&lt;!&ndash; 基本属性 url、user、password &ndash;&gt;-->
+        <!--<property name="url" value="${loris.jdbc.url}"/>-->
+        <!--<property name="username" value="${loris.jdbc.user}"/>-->
+        <!--<property name="password" value="${loris.jdbc.password}"/>-->
+    <!--</bean>-->
+
+    <bean id="dataSourceWrite" parent="abstractDataSource">
+        <!-- 基本属性 url、user、password -->
+        <property name="url" value="jdbc:mysql://192.168.197.111:3306/test"/>
+        <property name="username" value="root"/>
+        <property name="password" value="123456"/>
+    </bean>
+
+    <bean id="dataSource" class="com.loris.util.dataSource.DynamicRoutingDataSourceProxy">
+        <property name="writeDataSource" ref="dataSourceWrite" />
+        <property name="readDataSources">
+            <list>
+                <ref bean="dataSourceRead" />
+                <!--<ref bean="dataSourceRead2" />-->
+            </list>
+        </property>
+        <!--轮询方式，如果有多个从数据源的话，代码中之行的读操作会随机从其中一个获取-->
+        <property name="readDataSourcePollPattern" value="1" />
+    </bean>
+
+    <tx:annotation-driven transaction-manager="transactionManager"/>
+
+    <bean id="transactionManager" class="org.springframework.jdbc.datasource.DataSourceTransactionManager">
+        <property name="dataSource" ref="dataSource"/>
+    </bean>
+
+    <!-- 针对myBatis的配置项 -->
+    <!-- 配置sqlSessionFactory -->
+    <bean id="sqlSessionFactory" class="org.mybatis.spring.SqlSessionFactoryBean">
+        <!-- 实例化sqlSessionFactory时需要使用上述配置好的数据源以及SQL映射文件 -->
+        <property name="dataSource" ref="dataSource"/>
+        <property name="mapperLocations" value="classpath:mapping/*.xml"/>
+        <property name="configLocation" value="classpath:mybatis-context.xml" />
+    </bean>
+
+    <bean id="sqlSessionTemplate" class="org.mybatis.spring.SqlSessionTemplate">
+        <constructor-arg ref="sqlSessionFactory" />
+    </bean>
+    <!-- 通过扫描的模式，扫描目录下所有的mapper， 根据对应的mapper.xml为其生成代理类-->
+    <bean id="mapper" class="org.mybatis.spring.mapper.MapperScannerConfigurer">
+        <property name="basePackage" value="com.loris.dao" />
+        <property name="sqlSessionTemplate" ref="sqlSessionTemplate"></property>
+    </bean>
+
+</beans>
