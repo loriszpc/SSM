@@ -29,4 +29,7 @@ public interface UserMapper {
     int updateByPrimaryKey(User record);
 
     int addUser(@Param("sql") String sql);
+
+    /*测试上传*/
+
 }
